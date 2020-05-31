@@ -77,7 +77,7 @@ def scrape_advanced(year):
     import csv
     from bs4 import BeautifulSoup
 
-    out_path = 'data/NBA_totals_{}-{}.csv'.format(year-1, year)
+    out_path = 'data/NBA_advanced_{}-{}.csv'.format(year-1, year)
     csv_file = open(out_path, 'w')
     csv_writer = csv.writer(csv_file)
 
