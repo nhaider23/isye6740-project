@@ -1,3 +1,16 @@
+"""
+Python Program that:
+1. Uses career data of players from 1990-2010, PCA transforms to 5 dimensions, and 
+performs k means and k medoids clustering into six groups
+
+2. Uses second year stats of players from 1990-2010 and finds clusters averages
+
+3. Place cluster assignments for current second year players. Use cluster averages 
+of 1990-2010 players to measure euclidean distances to second year players. Place
+second year players in closest cluster
+
+4. Visualize data and results through graphs, tables, and spreadsheets 
+"""
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -12,7 +25,70 @@ import csv
 from bs4 import BeautifulSoup
 from sklearn.preprocessing import MinMaxScaler
 
+
 class Main(object):
+
+	"""
+	init function. second_yrs_current_season contains current player stats, second_yrs_1990_2010_season
+	contain stats of historical second year players, and second_yrs_1990_2010_career contains historical
+	career data.
+	Career data was initially scraped with scrape_player_career() function
+
+	Career data is scaled and normalized, goes through PCA transform, and then clustered and visualized
+	in historic_players_projections.
+
+	current_players_projections takes historical data clusters and clusters current players along with 
+	visualization and spreadsheets creation of players per cluster.
+	"""
+	def __init__(self):
+		# all current (2019-2020) second-year players
+		# these are the players we are predicting the future of
+		second_yrs_current_season_pd = pd.read_csv('data/second_yrs_season_2019-2020.csv', header=1)
+		second_yrs_current_season_players_list = second_yrs_current_season_pd.iloc[:,1].to_numpy()
+		second_yrs_current_season = second_yrs_current_season_pd.to_numpy()[0:,8:32].astype(float)
+		second_yrs_current_season = np.nan_to_num(second_yrs_current_season)
+
+		# list of players and their second-year stats for those who played 1990-2010
+		second_yrs_1990_2010_season_pd = pd.read_csv('data/second_yrs_season_1990-2010.csv', header=1)
+		second_yrs_1990_2010_season = second_yrs_1990_2010_season_pd.to_numpy()[0:,8:32].astype(float)
+		second_yrs_1990_2010_season = np.nan_to_num(second_yrs_1990_2010_season)
+
+		# extract player_list from second_yrs_1990_2010_season
+		player_list = second_yrs_1990_2010_season_pd.iloc[:,1]
+		player_list = player_list.str.split('\\').str[1]
+
+		#
+		#
+		# run in order to generate second_yrs_career_1990-2010.csv file
+		# note this is already generated
+		#self.scrape_player_career(player_list)
+		#
+		#
+
+		# second_yrs_career_1990-2010.csv is the career stats for 
+		# players who played second season between 1990 and 2010
+		second_yrs_1990_2010_career_pd = pd.read_csv('data/second_yrs_career_1990-2010.csv')
+		second_yrs_1990_2010_career = second_yrs_1990_2010_career_pd.to_numpy()[0:,:24].astype(float)
+		second_yrs_1990_2010_career = np.nan_to_num(second_yrs_1990_2010_career)
+
+		# normalize data before performing PCA
+		scaler = MinMaxScaler(feature_range=(0,1))
+		second_yrs_1990_2010_career_normalized = scaler.fit_transform(second_yrs_1990_2010_career)
+
+		# PCA Dimension reduction of career data
+		pca = PCA(n_components=5)
+		pca.fit(second_yrs_1990_2010_career_normalized)
+		#variance = pca.explained_variance_ratio_
+		reduced_representation_career_data = pca.transform(second_yrs_1990_2010_career_normalized)
+
+		# cluster and analyze historic players
+		career_labels_kmeans, career_labels_kmedoids = self.historic_players_projections(reduced_representation_career_data, player_list, second_yrs_1990_2010_career_pd)
+		#cluster and analyze current second year players
+		self.current_players_projections(career_labels_kmeans, career_labels_kmedoids, second_yrs_1990_2010_season, second_yrs_current_season, second_yrs_current_season_players_list)
+
+	"""
+	Function that creates pyplot tables of data
+	"""
 	def table_creator(self, title, table_data):
 		fig = plt.figure()
 		ax = fig.add_subplot(1,1,1)
@@ -23,6 +99,9 @@ class Main(object):
 		plt.title(title)
 		plt.show()
 
+	"""
+	Function used to gather total all star and all nba selectinos for historical players
+	"""
 	def extract_bling_info(self, soup):
 		""" number of All-star and All-NBA selections can be found in the "bling" element """
 		
@@ -45,11 +124,14 @@ class Main(object):
 		return ALL_STAR, ALL_NBA
 
 
+	"""
+	Function used to scrape and create csv file for career stats of historical players
+	"""
 	def scrape_player_career(self, player_list):
 		"""
 		given player ID, return player's career averages as pandas data frame
 		"""
-		
+
 		out_path = 'second_yrs_career_1990-2010.csv'
 		csv_file = open(out_path, 'w')
 		csv_writer = csv.writer(csv_file)
@@ -67,12 +149,10 @@ class Main(object):
 			URL = 'https://www.basketball-reference.com/players/{}/{}.html'.format(player_id[0], player_id)
 			r = requests.get(URL)
 			soup = BeautifulSoup(r.text, "html5lib")
-			
 			# extract desired columns from per-game table, career row 
 			# note each has a try except due to missing data for some players
 			# example: if player has never attempted a three point shot
 			career_per = soup.find(id="per_game").tfoot.contents[0]
-			
 			try:
 				G = career_per.contents[5].contents[0]
 			except:
@@ -85,7 +165,6 @@ class Main(object):
 				GS_PCT = 0
 			else:
 				GS_PCT = round(int(GS)/int(G), 2)
-				
 			try:
 				MP = career_per.contents[7].contents[0]
 			except:
@@ -180,22 +259,31 @@ class Main(object):
 				PTS = 0
 
 
-			ALL_STAR, ALL_NBA = extract_bling_info(soup)            
-			
+			ALL_STAR, ALL_NBA = extract_bling_info(soup)
 			row = [GS_PCT,MP,FG,FGA,TWO_P,TWO_PA,THREE_P,THREE_PA,FT,FTA,ORB,DRB,TRB,
 						AST,STL,BLK,TOV,PF,PTS,FG_PCT,TWO_PCT,THREE_PCT,EFG_PCT,FT_PCT,ALL_STAR,ALL_NBA]
 			csv_writer.writerow(row)
 
-	def historic_players_projections(self, reduced_representation_career_data, player_list, all_stars, all_nbas, gs_percents, minutes_per_game):
+	"""
+	The below clusters nba players from 1990 to 2010 into six groups with kmeans and kmedoids
+	Additionally, the below  displays each cluster in excel spreadsheets. and displays pypot tables.
+	One table describes average cluster characteristics and the other number of members per cluster.
+	"""
+	def historic_players_projections(self, reduced_representation_career_data, player_list, second_yrs_1990_2010_career_pd):
+
+		all_stars = second_yrs_1990_2010_career_pd.to_numpy()[0:,24].astype(float)
+		all_nbas = second_yrs_1990_2010_career_pd.to_numpy()[0:,25].astype(float)
+		gs_percents = second_yrs_1990_2010_career_pd.to_numpy()[0:,0].astype(float)
+		minutes_per_game = second_yrs_1990_2010_career_pd.to_numpy()[0:,1].astype(float)
+
 		for classifier in ['KMeans', 'KMedoids']:
 			# kmeans clustering of career data into 6 clusters
-			print('------------------------------------------------------------------------------------')
 			if classifier == 'KMeans':
-				print('KMEANS CLUSTERING')
+				print('KMEANS CLUSTERING Historic Players')
 				clf = KMeans(n_clusters=6, random_state=0).fit(reduced_representation_career_data)
 				career_labels_kmeans = clf.labels_
 			else:
-				print('KMEDOIDS CLUSTERING')
+				print('KMEDOIDS CLUSTERING Historic Players')
 				clf = KMedoids(n_clusters=6, random_state=0).fit(reduced_representation_career_data)
 				career_labels_kmedoids = clf.labels_
 
@@ -247,8 +335,6 @@ class Main(object):
 
 			table_data=[['Cluster 0', 'Cluster 1', 'Cluster 2', 'Cluster 3', 'Cluster 4', 'Cluster 5'], players_per_cluster.astype(int).tolist()]
 			self.table_creator(classifier + ' Historic Players Per Cluster', table_data)
-			#players_ =players_per_cluster.astype(int).tolist()
-			#x.insert(0, 'Players Per Cluster')
 
 			all_star_averages = np.round(career_all_stars_averages, 3).tolist()
 			all_star_averages.insert(0, 'ALL STARS')
@@ -263,16 +349,20 @@ class Main(object):
 
 		return (career_labels_kmeans, career_labels_kmedoids)
 
+	"""
+	The below clusters current nba second year players into six groups with kmeans and kmedoids
+	Additionally, the below  displays each cluster in excel spreadsheets and displays pypot tables.
+	One table describes the number of members per cluster.
+	"""
 	def current_players_projections(self, career_labels_kmeans, career_labels_kmedoids, second_yrs_1990_2010_season, second_yrs_current_season, second_yrs_current_season_players_list):
 		for classifier in ['KMeans', 'KMedoids']:
 			# averages of second year performance per cluster
 			#
-			print('------------------------------------------------------------------------------------')
 			if classifier == 'KMeans':
-				print('KMEANS CLUSTERING')
+				print('KMEANS CLUSTERING Current Players')
 				career_labels = career_labels_kmeans
 			else:
-				print('KMEDOIDS CLUSTERING')
+				print('KMEDOIDS CLUSTERING Current Players')
 				career_labels = career_labels_kmedoids
 			second_year_cluster_averages = np.zeros((len(set(career_labels)), len(second_yrs_1990_2010_season[0])))
 			for i in range(len(set(career_labels))):
@@ -299,51 +389,6 @@ class Main(object):
 			for i in range(6):
 				df = pd.DataFrame(player_names[i], columns = ['Cluster ' + str(i)]) 
 				df.to_csv('data/clustering_second_year_players/' + classifier + 'current_players_cluster_' + str(i) + '.csv', index=False)
-
-	def __init__(self):
-		# all current (2019-2020) second-year players
-		# these are the players we are predicting the future of
-		second_yrs_current_season_pd = pd.read_csv('data/second_yrs_season_2019-2020.csv', header=1)
-		second_yrs_current_season_players_list = second_yrs_current_season_pd.iloc[:,1].to_numpy()
-		second_yrs_current_season = second_yrs_current_season_pd.to_numpy()[0:,8:32].astype(float)
-		second_yrs_current_season = np.nan_to_num(second_yrs_current_season)
-
-		# list of players and their second-year stats for those who played 1990-2010
-		second_yrs_1990_2010_season_pd = pd.read_csv('data/second_yrs_season_1990-2010.csv', header=1)
-		second_yrs_1990_2010_season = second_yrs_1990_2010_season_pd.to_numpy()[0:,8:32].astype(float)
-		second_yrs_1990_2010_season = np.nan_to_num(second_yrs_1990_2010_season)
-
-		# extract player_list from second_yrs_1990_2010_season
-		player_list = second_yrs_1990_2010_season_pd.iloc[:,1]
-		player_list = player_list.str.split('\\').str[1]
-
-
-		# run in order to generate second_yrs_career_1990-2010.csv file
-		# note this is already generated
-		#self.scrape_player_career(player_list)
-
-		# second_yrs_career_1990-2010.csv is the career stats for 
-		# players who played second season between 1990 and 2010
-		second_yrs_1990_2010_career_pd = pd.read_csv('data/second_yrs_career_1990-2010.csv')
-		second_yrs_1990_2010_career = second_yrs_1990_2010_career_pd.to_numpy()[0:,:24].astype(float)
-		second_yrs_1990_2010_career = np.nan_to_num(second_yrs_1990_2010_career)
-		all_stars = second_yrs_1990_2010_career_pd.to_numpy()[0:,24].astype(float)
-		all_nbas = second_yrs_1990_2010_career_pd.to_numpy()[0:,25].astype(float)
-		gs_percents = second_yrs_1990_2010_career_pd.to_numpy()[0:,0].astype(float)
-		minutes_per_game = second_yrs_1990_2010_career_pd.to_numpy()[0:,1].astype(float)
-
-		# normalize data before performing PCA
-		scaler = MinMaxScaler(feature_range=(0,1))
-		second_yrs_1990_2010_career_normalized = scaler.fit_transform(second_yrs_1990_2010_career)
-
-		# PCA Dimension reduction of career data
-		pca = PCA(n_components=5)
-		pca.fit(second_yrs_1990_2010_career_normalized)
-		#variance = pca.explained_variance_ratio_
-		reduced_representation_career_data = pca.transform(second_yrs_1990_2010_career_normalized)
-
-		career_labels_kmeans, career_labels_kmedoids = self.historic_players_projections(reduced_representation_career_data, player_list, all_stars, all_nbas, gs_percents, minutes_per_game)
-		self.current_players_projections(career_labels_kmeans, career_labels_kmedoids, second_yrs_1990_2010_season, second_yrs_current_season, second_yrs_current_season_players_list)
 
 if __name__ == "__main__":
 	Main()
