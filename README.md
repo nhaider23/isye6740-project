@@ -3,13 +3,17 @@
 Owners: Nafiz Haider, Daniel Jiang
 
 Problem Statement:
-Model NBA players in their second seasons (Luka Doncic, Trae Young, etc.) and predict career trajectory
-Reference historical data of players in their second seasons from 1990-2010
-Come up with clusterings/classifications (i.e. all-star calibre, rotation players, starters, hall of farmers, all time greats) and project current players in those groups
-Account for/address shortened season due to COVID-19 and scale player projections to regular 82 game season
+Cluster historical data of players in their second seasons from 1990-2010 using K-means and K-medoids and assign to 6 cluster "tiers"
+Project NBA players in their second seasons in 2019-2020 (Luka Doncic, Trae Young, etc.) and career cluster trajectory using historic models
 
+# To Run the Program:
 
-Methodology
+# using python and terminal
+cd path/to/isye6740-project;
+python NBA_Player_Analysis.py
 
-
-To Run the Program
+# using jupyter notebook
+#run the following commands:
+cd path/to/isye6740-project;
+jupyter notebook;
+#open 'NBA_Player_Analysis.ipynb' in browser and run code boxes
