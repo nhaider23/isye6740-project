@@ -15,5 +15,4 @@ Project NBA players in their second seasons in 2019-2020 (Luka Doncic, Trae Youn
 ### If you are using Jupyter Notebook:
     cd path/to/isye6740-project;
     jupyter notebook;
-  
-open 'NBA_Player_Analysis.ipynb' in browser and run code blocks
+    open 'NBA_Player_Analysis.ipynb' in browser and run code blocks
